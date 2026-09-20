@@ -1,0 +1,54 @@
+import { useState } from "react";
+import { toast } from "sonner";
+import { Activity, ArrowRight, Check, ChevronRight, Clock3, Cloud, Database, ExternalLink, LockKeyhole, RefreshCw, ShieldCheck, Smartphone, Table2, Users, Zap } from "lucide-react";
+
+const businesses = [
+  { name: "Titusville Self-Storage", short: "T", tone: "blue", access: "Admin · ESS connected", owner: "You + Josh + Ed" },
+  { name: "Pizza Restaurant", short: "P", tone: "orange", access: "Admin · POS pending", owner: "You + Josh + Ed" },
+  { name: "Quartz Blanc", short: "Q", tone: "purple", access: "Admin · Partner scope", owner: "You + Ed + partner" },
+  { name: "Skinny Cookies", short: "S", tone: "green", access: "Admin · E-commerce pending", owner: "You" },
+];
+
+const syncSources = [
+  { name: "Easy Storage Solutions", type: "Storage / billing", last: "Not connected", status: "Needs connector", tone: "orange", tables: "customers · payments · gate_logs" },
+  { name: "Pizza POS", type: "Restaurant sales", last: "Not connected", status: "Needs connector", tone: "orange", tables: "customers · orders · inventory" },
+  { name: "Skinny Cookies e-commerce", type: "Online orders", last: "Not connected", status: "Needs connector", tone: "orange", tables: "customers · orders · inventory" },
+];
+
+const chartData = {
+  "7d": [
+    { day: "Mon", pizza: 2380, cookies: 42, occupancy: 82 },
+    { day: "Tue", pizza: 2650, cookies: 48, occupancy: 83 },
+    { day: "Wed", pizza: 2190, cookies: 38, occupancy: 83 },
+    { day: "Thu", pizza: 2870, cookies: 55, occupancy: 84 },
+    { day: "Fri", pizza: 3420, cookies: 61, occupancy: 85 },
+    { day: "Sat", pizza: 3960, cookies: 72, occupancy: 85 },
+    { day: "Sun", pizza: 3150, cookies: 86, occupancy: 86 },
+  ],
+  "30d": [
+    { day: "Wk 1", pizza: 12100, cookies: 182, occupancy: 80 },
+    { day: "Wk 2", pizza: 13400, cookies: 214, occupancy: 82 },
+    { day: "Wk 3", pizza: 14250, cookies: 246, occupancy: 84 },
+    { day: "Wk 4", pizza: 15620, cookies: 289, occupancy: 86 },
+  ],
+};
+
+function StatusPill({ children, tone = "orange" }: { children: React.ReactNode; tone?: string }) { return <span className={`hub-status ${tone}`}>{children}</span>; }
+
+function PortfolioChart() {
+  const [range, setRange] = useState<"7d" | "30d">("7d");
+  const [metric, setMetric] = useState<"sales" | "occupancy">("sales");
+  const data = chartData[range];
+  const maxPizza = Math.max(...data.map((item) => item.pizza));
+  const maxCookies = Math.max(...data.map((item) => item.cookies));
+  const maxValue = metric === "sales" ? maxPizza : 100;
+  return <div className="hub-chart-card ops-panel"><div className="hub-chart-header"><div><div className="ops-panel-title"><Activity size={16} /> Portfolio performance <span>Illustrative dashboard data</span></div><h3>Daily sales vs. storage occupancy</h3><p>Compare operating momentum across the portfolio without mixing the underlying systems.</p></div><div className="hub-chart-controls"><div className="hub-chart-toggle">{(["7d", "30d"] as const).map((value) => <button className={range === value ? "active" : ""} key={value} onClick={() => setRange(value)}>{value === "7d" ? "7 days" : "30 days"}</button>)}</div><select value={metric} onChange={(event) => setMetric(event.target.value as "sales" | "occupancy")}><option value="sales">Sales view</option><option value="occupancy">Occupancy view</option></select></div></div><div className="hub-chart-legend"><span><i className="pizza" /> Pizza Restaurant sales</span><span><i className="cookies" /> Skinny Cookies orders</span><span><i className="occupancy" /> Titusville occupancy</span></div><div className="hub-chart-plot"><div className="hub-chart-y"><span>{metric === "sales" ? "$4k" : "100%"}</span><span>{metric === "sales" ? "$2k" : "75%"}</span><span>{metric === "sales" ? "$0" : "50%"}</span></div><div className="hub-chart-area"><div className="hub-chart-lines" /><div className="hub-chart-bars">{data.map((item) => <div className="hub-chart-column" key={item.day}><div className="hub-bars"><i className="pizza" style={{ height: `${metric === "sales" ? (item.pizza / maxValue) * 100 : item.occupancy}%` }} /><i className="cookies" style={{ height: `${metric === "sales" ? (item.cookies / maxCookies) * 48 : item.occupancy - 38}%` }} /></div><span>{item.day}</span></div>)}</div><svg className="hub-chart-line" viewBox={`0 0 ${data.length * 100} 100`} preserveAspectRatio="none" aria-label="Titusville occupancy trend"><polyline points={data.map((item, index) => `${index * 100 + 50},${100 - item.occupancy}`).join(" ")} fill="none" stroke="#735ba5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />{data.map((item, index) => <circle key={item.day} cx={index * 100 + 50} cy={100 - item.occupancy} r="3.5" fill="#735ba5" />)}</svg></div></div><div className="hub-chart-summary"><div><strong>$23,620</strong><span>Pizza sales · selected period</span></div><div><strong>402</strong><span>Skinny Cookies orders</span></div><div><strong>86%</strong><span>Titusville occupancy</span></div></div></div>;
+}
+
+export default function ExecutiveHubWorkspace({ profile }: { profile?: { name: string; role: string; businesses: string[]; quartz: boolean; admin: boolean } }) {
+  const [running, setRunning] = useState(false);
+  const visibleBusinesses = businesses.filter((business) => !profile || profile.businesses.includes(business.name));
+  const [selected, setSelected] = useState("all");
+  const triggerSync = () => { setRunning(true); toast.success("Sync check queued", { description: "Live connectors are required before records can be imported." }); setTimeout(() => setRunning(false), 1200); };
+  return <div className="ops-stack executive-hub-workspace"><div className="hub-hero"><div><span className="ops-kicker">Executive Hub · integration control room</span><h2>One operating picture. <em>Separate business truth.</em></h2><p>Connect authorized businesses without blending their records. {profile?.name || "Your team"} has {profile?.admin ? "admin access with shared executive logs" : "role-scoped executive access"}.</p></div><div className="hub-admin-badge"><ShieldCheck size={18} /><strong>{profile?.admin ? "Admin access" : "Executive access"}</strong><small>{profile?.admin ? "All authorized businesses" : `${profile?.businesses.length || 4} authorized businesses`}</small></div></div><div className="hub-metrics"><div><Database size={16} /><strong>{profile?.businesses.length || 4}</strong><span>Authorized workspaces</span></div><div><RefreshCw size={16} /><strong>10 min</strong><span>Planned sync cadence</span></div><div><Zap size={16} /><strong>Change-only</strong><span>Notifications and SMS</span></div><div><Table2 size={16} /><strong>5</strong><span>Core data tables</span></div></div><PortfolioChart /><div className="hub-section-heading"><div><span className="ops-kicker">Portfolio access</span><h3>Who can see what</h3></div><button className="ops-outline-button" onClick={() => toast("Permission editor opened")}>Manage permissions <Users size={14} /></button></div><div className="hub-business-grid">{visibleBusinesses.map((business) => <button className={`hub-business-card ${selected === business.name ? "selected" : ""}`} key={business.name} onClick={() => setSelected(business.name)}><span className={`hub-business-logo ${business.tone}`}>{business.short}</span><span><strong>{business.name}</strong><small>{business.access}</small><small>{business.owner}</small></span><ChevronRight size={14} /></button>)}</div><div className="hub-section-heading"><div><span className="ops-kicker">Data synchronization</span><h3>Source systems and last sync</h3><p>Production sync stays disabled until the approved connectors and database credentials are configured.</p></div><button className="ops-primary-button" onClick={triggerSync}>{running ? <><RefreshCw className="hub-spin" size={14} /> Checking…</> : <><RefreshCw size={14} /> Run sync check</>}</button></div><div className="hub-sync-grid">{syncSources.map((source) => <div className="ops-panel hub-sync-card" key={source.name}><div className="hub-sync-title"><span className={`hub-source-icon ${source.tone}`}><Cloud size={15} /></span><div><strong>{source.name}</strong><small>{source.type}</small></div><StatusPill>{source.status}</StatusPill></div><div className="hub-sync-line"><span><Clock3 size={13} /> Last sync</span><b>{source.last}</b></div><div className="hub-sync-line"><span><Table2 size={13} /> Target tables</span><b>{source.tables}</b></div><button className="hub-link-button" onClick={() => toast("Connector setup opened", { description: `Configure ${source.name} credentials in a secure server-side environment.` })}>Configure connector <ArrowRight size={13} /></button></div>)}</div><div className="hub-bottom-grid"><div className="ops-panel"><div className="ops-panel-title"><Zap size={16} /> Change-trigger rules <span>Planned behavior</span></div><div className="hub-rule"><Check size={14} /><div><strong>Sync records every 10 minutes</strong><small>Use updated_at / version markers and idempotent upserts.</small></div></div><div className="hub-rule"><Check size={14} /><div><strong>Notify only when a record changes</strong><small>Hash or compare normalized fields before SMS, VoIP, or alerts.</small></div></div><div className="hub-rule"><Check size={14} /><div><strong>Show sync timestamps</strong><small>Store source_synced_at, hub_updated_at, and sync_status per source.</small></div></div></div><div className="ops-panel"><div className="ops-panel-title"><Database size={16} /> Central database schema <span>Expandable</span></div><div className="hub-table-list"><span><Database size={13} /> customers</span><span><Database size={13} /> payments</span><span><Database size={13} /> orders</span><span><Database size={13} /> inventory</span><span><Database size={13} /> gate_logs</span></div><button className="hub-link-button" onClick={() => toast("Schema blueprint opened")}>View schema blueprint <ArrowRight size={13} /></button></div></div><div className="hub-security-strip"><LockKeyhole size={16} /><div><strong>Recommended production boundary</strong><p>Keep API keys, SMS/VoIP credentials, and database writes server-side. {profile?.admin ? "Marisa’s executive actions are shared with Josh and Ed through the audit log." : "Executive actions are shared with Josh and Ed; Quartz Blanc is visible only to authorized users such as Ed."}</p></div><button onClick={() => toast("Deployment checklist opened")}><ExternalLink size={14} /> Deployment checklist</button></div><div className="hub-hosting-note"><Smartphone size={15} /><span><strong>Hosting plan:</strong> use the app dashboard for visibility, a persistent background worker for ten-minute syncs, and Cloudflare as the edge/security layer. GoDaddy can remain the domain/hosting account if DNS points to the deployed app.</span></div></div>;
+}
