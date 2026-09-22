@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import IntegrationArchitecture from "../components/IntegrationArchitecture";
 import OperationsDashboard from "../components/OperationsDashboard";
-import { X as CloseIcon, LockKeyhole } from "lucide-react";
+import { X as CloseIcon, LockKeyhole, Loader2, AlertCircle } from "lucide-react";
+import { type AccessProfile, signInWithPassword, signOut as authSignOut, restoreSession, fetchAllProfiles } from "../lib/auth";
+import ChatWidget from "../components/ChatWidget";
+import LeasingAdmin from "../components/LeasingAdmin";
 import "../ess-integration.css";
 import "../operations.css";
 import {
@@ -11,6 +14,7 @@ import {
   Bell,
   BellRing,
   BriefcaseBusiness,
+  Building2,
   Database,
   CalendarDays,
   Check,
@@ -100,17 +104,41 @@ function AppButton({ children, variant = "primary", onClick, className = "" }: {
   return <button onClick={onClick} className={`app-button app-button-${variant} ${className}`}>{children}</button>;
 }
 
-type AccessProfile = { id: "josh" | "ed" | "marisa" | "settings"; name: string; initials: string; role: string; businesses: string[]; quartz: boolean; admin: boolean; owner: boolean; settingsAdmin: boolean; canManageSettings: boolean; canViewImportantData: boolean };
-
-const accessProfiles: AccessProfile[] = [
-  { id: "josh", name: "Josh", initials: "J", role: "Owner · Full business access", businesses: ["Titusville Self-Storage", "Pizza Restaurant", "Skinny Cookies"], quartz: false, admin: true, owner: true, settingsAdmin: false, canManageSettings: true, canViewImportantData: true },
-  { id: "ed", name: "Ed", initials: "E", role: "Owner · Partnership access", businesses: ["Titusville Self-Storage", "Pizza Restaurant", "Quartz Blanc", "Skinny Cookies"], quartz: true, admin: true, owner: true, settingsAdmin: false, canManageSettings: true, canViewImportantData: true },
-  { id: "marisa", name: "Marisa", initials: "M", role: "Executive Assistant · Limited access", businesses: ["Titusville Self-Storage", "Pizza Restaurant", "Skinny Cookies"], quartz: false, admin: false, owner: false, settingsAdmin: false, canManageSettings: false, canViewImportantData: false },
-  { id: "settings", name: "Admin User", initials: "A", role: "Settings Administrator · No business data", businesses: [], quartz: false, admin: true, owner: false, settingsAdmin: true, canManageSettings: true, canViewImportantData: false },
-];
-
 function SignInPanel({ onSelect, onClose }: { onSelect: (profile: AccessProfile) => void; onClose: () => void }) {
-  return <div className="signin-backdrop" role="dialog" aria-modal="true"><div className="signin-panel"><button className="signin-close" onClick={onClose} aria-label="Close sign in"><CloseIcon size={17} /></button><div className="signin-kicker"><LockKeyhole size={15} /> Secure staff access</div><h2>Sign in to <em>JOSH AND ED.</em></h2><p>Select your profile to preview the business workspaces and permissions assigned to you.</p><div className="signin-profiles">{accessProfiles.map((profile) => <button key={profile.id} className="signin-profile" onClick={() => onSelect(profile)}><span className={`signin-avatar ${profile.id}`}>{profile.initials}</span><span><strong>{profile.name}</strong><small>{profile.role}</small><small>{profile.businesses.join(" · ")}</small></span><ArrowRight size={15} /></button>)}</div><div className="signin-note"><ShieldCheck size={15} /><span><strong>Shared executive logs</strong><small>Approvals, role changes, exports, and executive actions are visible to authorized admins.</small></span></div></div></div>;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!email || !password) { setError("Enter your email and password."); return; }
+    setLoading(true);
+    setError(null);
+    const { profile, error: signInError } = await signInWithPassword(email.trim(), password);
+    setLoading(false);
+    if (signInError || !profile) { setError(signInError || "Sign in failed."); return; }
+    onSelect(profile);
+  };
+
+  return <div className="signin-backdrop" role="dialog" aria-modal="true"><div className="signin-panel"><button className="signin-close" onClick={onClose} aria-label="Close sign in"><CloseIcon size={17} /></button><div className="signin-kicker"><LockKeyhole size={15} /> Secure staff access</div><h2>Sign in to <em>JOSH AND ED.</em></h2><p>Enter your email and password to open your workspace.</p>
+    <form className="signin-form" onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, textAlign: "left" }}>
+        Email
+        <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" disabled={loading}
+          style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border, #e1e0d9)", fontSize: 14 }} />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, textAlign: "left" }}>
+        Password
+        <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" disabled={loading}
+          style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border, #e1e0d9)", fontSize: 14 }} />
+      </label>
+      {error && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#d03b3b", fontSize: 13 }}><AlertCircle size={14} /> {error}</div>}
+      <button type="submit" disabled={loading} className="app-button app-button-primary signin-submit" style={{ justifyContent: "center" }}>
+        {loading ? <><Loader2 size={16} className="hub-spin" /> Signing in…</> : <>Sign in <ArrowRight size={16} /></>}
+      </button>
+    </form>
+    <div className="signin-note"><ShieldCheck size={15} /><span><strong>Individual accounts only</strong><small>Never share a login. Approvals, role changes, and executive actions are visible to authorized admins.</small></span></div></div></div>;
 }
 
 function PublicHome({ onEnter }: { onEnter: (profile?: AccessProfile) => void }) {
@@ -162,13 +190,14 @@ function PublicHome({ onEnter }: { onEnter: (profile?: AccessProfile) => void })
 
         <section className="login-cta"><div><div className="eyebrow eyebrow-light">For owners & managers</div><h2>One professional operating layer.</h2><p>Coordinate priorities, staff, support, reporting, and approvals across every business while each source system keeps its own truth.</p></div><AppButton variant="secondary" onClick={onEnter}>Open executive hub <ArrowRight size={17} /></AppButton></section>
       </main>
-      <footer className="public-footer"><PortfolioMark light /><span>© 2025 JOSH AND ED Operations Hub · Professional portfolio operations</span><span className="footer-phone"><Phone size={14} /> Executive operations</span></footer>
+      <footer className="public-footer"><PortfolioMark light /><span>© 2025 JOSH AND ED Operations Hub · Professional portfolio operations</span><span className="footer-phone"><Phone size={14} /> Executive operations</span><span style={{ fontSize: 12, opacity: 0.75 }}>Built by <a href="mailto:retchvisionai@outlook.com" style={{ color: "inherit", textDecoration: "underline" }}>Retch VisionAI Solutions</a></span></footer>
     </div>
   );
 }
 
 function Sidebar({ active, setActive, profile }: { active: string; setActive: (item: string) => void; profile: AccessProfile }) {
-  const visibleNavItems = profile.settingsAdmin ? [{ label: "Setup Center", icon: Rocket }, { label: "Access Settings", icon: Settings2 }, { label: "Audit Log", icon: ClipboardList }] : profile.owner ? [...navItems, { label: "Calendar & Reminders", icon: CalendarDays }, { label: "Setup Center", icon: Rocket }, { label: "Access Settings", icon: Settings2 }, { label: "Audit Log", icon: ClipboardList }, { label: "Call Conferencing", icon: Video }] : [...navItems.filter((item) => !["Executive Hub", "Executive View", "Reports"].includes(item.label)), { label: "Calendar & Reminders", icon: CalendarDays }, { label: "Call Conferencing", icon: Video }];
+  const leasingItem = profile.leasingRole !== "none" ? [{ label: "Commercial Leasing", icon: Building2 }] : [];
+  const visibleNavItems = profile.settingsAdmin ? [{ label: "Setup Center", icon: Rocket }, { label: "Access Settings", icon: Settings2 }, { label: "Audit Log", icon: ClipboardList }, ...leasingItem] : profile.owner ? [...navItems, { label: "Calendar & Reminders", icon: CalendarDays }, ...leasingItem, { label: "Setup Center", icon: Rocket }, { label: "Access Settings", icon: Settings2 }, { label: "Audit Log", icon: ClipboardList }, { label: "Call Conferencing", icon: Video }] : [...navItems.filter((item) => !["Executive Hub", "Executive View", "Reports"].includes(item.label)), { label: "Calendar & Reminders", icon: CalendarDays }, ...leasingItem, { label: "Call Conferencing", icon: Video }];
   return <aside className="sidebar"><BrandMark /><div className="sidebar-label">Executive Hub</div><nav>{visibleNavItems.map(({ label, icon: Icon }) => <button key={label} className={active === label ? "active" : ""} onClick={() => setActive(label)}><Icon size={18} /><span>{label}</span>{label === "Late Payments" && <b>18</b>}{label === "Support Requests" && <b>7</b>}</button>)}</nav><div className="sidebar-help"><div className="help-orb"><LifeBuoy size={17} /></div><strong>Need a hand?</strong><p>Operations support is here.</p><button onClick={() => toast.success("Support center opened", { description: "A member of our team will be with you shortly." })}>Visit support <ArrowRight size={14} /></button></div><div className="sidebar-profile"><div className={`profile-avatar ${profile.id}`}>{profile.initials}</div><div><strong>{profile.name}</strong><small>{profile.role}</small></div><ChevronRight size={15} /></div></aside>;
 }
 
@@ -185,7 +214,8 @@ function DashboardContent({ setActive }: { setActive: (item: string) => void }) 
       <div className="units-list">{units.map((unit) => <div className="unit-row-card" key={unit.label}><div className={`unit-art unit-art-${unit.tone}`}><div className="unit-art-door" /><div className="unit-art-door" /><div className="unit-art-door active-door" /></div><div className="unit-info"><div className="unit-name-row"><strong>{unit.label}</strong><span className="status-pill"><span />{unit.status}</span></div><p>{unit.size}</p><span className="unit-location"><HomeIcon size={13} /> 905 Main Street · Titusville, FL</span></div><div className="unit-price"><strong>{unit.value}</strong><button onClick={() => setActive("My Units")}>View details <ChevronRight size={14} /></button></div></div>)}</div>
       <div className="bottom-cards"><div className="referral-card"><div className="referral-icon"><Tag size={19} /></div><div><span className="eyebrow">Share the space</span><h3>Give $50, get $50.</h3><p>Refer a friend and you both save on storage.</p><button onClick={() => toast.success("Referral link copied", { description: "Share it with your favorite neighbor." })}>Get your referral link <ArrowRight size={14} /></button></div><div className="referral-blob" /></div><div className="message-card"><div className="card-heading"><span><MessageSquareText size={16} /> Recent messages</span><button onClick={() => setActive("Messages")}>See all <ArrowRight size={14} /></button></div><div className="message-item"><div className="message-avatar">TS</div><div><strong>Titusville Self-Storage</strong><p>Your October statement is ready to view.</p><small>2 hours ago</small></div><span className="unread-dot" /></div><div className="message-item"><div className="message-avatar orange-avatar">JD</div><div><strong>You</strong><p>Thanks! I’ve got it.</p><small>Yesterday</small></div></div></div></div>
     </div><aside className="dashboard-side"><div className="side-card side-card-blue"><div className="side-card-top"><span className="side-label">Documents vault</span><FileText size={18} /></div><h3>Everything important,<br /><em>in one safe place.</em></h3><p>Leases, receipts, and statements — always ready when you are.</p><button onClick={() => setActive("Documents")}>Open document vault <ArrowRight size={15} /></button><div className="paper-shape"><FileText size={38} /></div></div><div className="side-card support-card"><div className="side-card-top"><span className="side-label">Support center</span><LifeBuoy size={18} /></div><h3>How can we help?</h3><p>Find an answer or start a conversation with our team.</p><div className="support-links"><button onClick={() => setActive("Support")}><CircleHelp size={16} /> Browse help center <ChevronRight size={14} /></button><button onClick={() => setActive("Messages")}><MessageCircle size={16} /> Message the team <ChevronRight size={14} /></button><button onClick={() => toast("Call us at 321-222-3538") }><Phone size={16} /> Call 321-222-3538 <ChevronRight size={14} /></button></div></div><div className="side-note"><CalendarDays size={17} /><span><strong>Gate access</strong><br />Open daily 7:00 AM – 8:00 PM</span></div></aside></div>
-    <button className="sms-button" onClick={() => toast.success("SMS support ready", { description: "Text us at 321-222-3538." })}><MessageCircle size={19} /><span>Text support</span></button><button className="chat-fab" onClick={() => toast.success("Live chat opened", { description: "A Titusville team member will be right with you." })}><MessageCircle size={21} /><i /></button>
+    <button className="sms-button" onClick={() => toast.success("SMS support ready", { description: "Text us at 321-222-3538." })}><MessageCircle size={19} /><span>Text support</span></button>
+    <ChatWidget tenantContext="Tenant: Jordan. Unit 204 (10x20 climate controlled, $135.00/mo, Active), Parking P-12 (Outdoor RV parking, $75.00/mo, Active). Next payment due October 1, 2025, $210.00." />
   </div>;
 }
 
@@ -299,20 +329,38 @@ function PlaceholderPage({ title, setActive }: { title: string; setActive: (item
 
 function Dashboard({ onHome, profile }: { onHome: () => void; profile: AccessProfile }) {
   const [active, setActive] = useState(profile.settingsAdmin ? "Access Settings" : profile.owner ? "Executive Hub" : "Support Requests");
-  const [profiles, setProfiles] = useState<AccessProfile[]>(accessProfiles);
+  const [profiles, setProfiles] = useState<AccessProfile[]>([profile]);
   const [profileHistory, setProfileHistory] = useState<AccessProfile[][]>([]);
+  useEffect(() => { fetchAllProfiles().then((rows) => { if (rows.length) setProfiles(rows); }); }, []);
   const setProfilesWithHistory: React.Dispatch<React.SetStateAction<AccessProfile[]>> = (next) => { setProfiles((previous) => { const updated = typeof next === "function" ? next(previous) : next; if (updated !== previous) setProfileHistory((history) => [...history, previous].slice(-10)); return updated; }); };
   const undoProfileChange = () => setProfileHistory((history) => { const previous = history.at(-1); if (previous) { setProfiles(previous); toast.success("Change undone", { description: "The previous permission state has been restored." }); return history.slice(0, -1); } toast("Nothing to undo"); return history; });
   const activeProfile = profiles.find((item) => item.id === profile.id) || profile;
   const opsLabels = ["Executive Hub", "Executive View", "Operations", "SMS Reminders", "Late Payments", "Support Requests", "Gate Access", "Staff Notes", "Reports"];
   const opsTabMap: Record<string, string> = { "Executive Hub": "hub", "Executive View": "executive", Operations: "overview", "SMS Reminders": "reminders", "Late Payments": "late", "Support Requests": "support", "Gate Access": "gate", "Staff Notes": "notes", Reports: "reports" };
-  return <div className="dashboard-shell"><Sidebar active={active} setActive={setActive} profile={activeProfile} /><div className="dashboard-app"><Topbar active={active} onHome={onHome} profile={activeProfile} />{opsLabels.includes(active) ? <OperationsDashboard initialTab={opsTabMap[active]} profile={activeProfile} /> : active === "ESS Integration" ? <IntegrationArchitecture /> : active === "Google Reviews" ? <GoogleReviews profile={activeProfile} /> : active === "Calendar & Reminders" ? <CalendarReminders profile={activeProfile} /> : active === "Setup Center" && (activeProfile.owner || activeProfile.settingsAdmin) ? <SetupCenter /> : active === "Access Settings" && (activeProfile.owner || activeProfile.settingsAdmin) ? <AccessSettings profiles={profiles} setProfiles={setProfilesWithHistory} onUndo={undoProfileChange} canEdit={activeProfile.canManageSettings} isOwner={activeProfile.owner} onOpenAudit={() => setActive("Audit Log")} /> : active === "Audit Log" && (activeProfile.owner || activeProfile.settingsAdmin) ? <AuditLog profiles={profiles} /> : active === "Call Conferencing" ? <CallConferencing /> : <PlaceholderPage title={active} setActive={setActive} />}</div></div>;
+  return <div className="dashboard-shell"><Sidebar active={active} setActive={setActive} profile={activeProfile} /><div className="dashboard-app"><Topbar active={active} onHome={onHome} profile={activeProfile} />{opsLabels.includes(active) ? <OperationsDashboard initialTab={opsTabMap[active]} profile={activeProfile} /> : active === "ESS Integration" ? <IntegrationArchitecture /> : active === "Google Reviews" ? <GoogleReviews profile={activeProfile} /> : active === "Calendar & Reminders" ? <CalendarReminders profile={activeProfile} /> : active === "Setup Center" && (activeProfile.owner || activeProfile.settingsAdmin) ? <SetupCenter /> : active === "Access Settings" && (activeProfile.owner || activeProfile.settingsAdmin) ? <AccessSettings profiles={profiles} setProfiles={setProfilesWithHistory} onUndo={undoProfileChange} canEdit={activeProfile.canManageSettings} isOwner={activeProfile.owner} onOpenAudit={() => setActive("Audit Log")} /> : active === "Audit Log" && (activeProfile.owner || activeProfile.settingsAdmin) ? <AuditLog profiles={profiles} /> : active === "Call Conferencing" ? <CallConferencing /> : active === "Commercial Leasing" ? <LeasingAdmin profile={activeProfile} /> : <PlaceholderPage title={active} setActive={setActive} />}</div></div>;
 }
 
 export default function Home() {
   const [view, setView] = useState<"home" | "dashboard">("home");
   const [signinOpen, setSigninOpen] = useState(false);
-  const [profile, setProfile] = useState<AccessProfile>(accessProfiles[0]);
+  const [profile, setProfile] = useState<AccessProfile | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    restoreSession().then((restored) => {
+      if (restored) { setProfile(restored); setView("dashboard"); }
+      setCheckingSession(false);
+    });
+  }, []);
+
   const enter = (selected?: AccessProfile) => { if (selected) setProfile(selected); setSigninOpen(false); setView("dashboard"); };
-  return view === "home" ? <><PublicHome onEnter={() => setSigninOpen(true)} />{signinOpen && <SignInPanel onSelect={enter} onClose={() => setSigninOpen(false)} />}</> : <Dashboard profile={profile} onHome={() => setView("home")} />;
+  const goHome = () => { authSignOut(); setProfile(null); setView("home"); };
+
+  if (checkingSession) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={28} className="hub-spin" /></div>;
+  }
+
+  return view === "home" || !profile
+    ? <><PublicHome onEnter={() => setSigninOpen(true)} />{signinOpen && <SignInPanel onSelect={enter} onClose={() => setSigninOpen(false)} />}</>
+    : <Dashboard profile={profile} onHome={goHome} />;
 }

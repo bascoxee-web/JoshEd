@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://josh-ed.vercel.app/leasing</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/spaces/warehouse-a</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/spaces/warehouse-b</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/spaces/combined-a-b</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/space-finder</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/for/contractor-space</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/for/business-storage</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/for/ecommerce-warehouse</loc></url>
+  <url><loc>https://josh-ed.vercel.app/leasing/for/warehouse-for-rent</loc></url>
+</urlset>

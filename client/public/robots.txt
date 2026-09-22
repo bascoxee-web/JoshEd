@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /leasing
+Allow: /leasing/spaces/
+Allow: /leasing/space-finder
+Allow: /leasing/for/
+Disallow: /
+Sitemap: https://josh-ed.vercel.app/sitemap.xml
